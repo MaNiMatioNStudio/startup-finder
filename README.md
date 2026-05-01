@@ -19,8 +19,8 @@ cp .env.example .env
 `.env` に以下を設定してください:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...      # Claude API キー
-X_BEARER_TOKEN=...                 # X (Twitter) API Bearer Token
+ANTHROPIC_API_KEY=
+X_BEARER_TOKEN=
 ```
 
 ### 3. データベースの初期化

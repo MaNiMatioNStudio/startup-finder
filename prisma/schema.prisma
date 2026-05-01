@@ -7,187 +7,91 @@ datasource db {
   provider = "sqlite"
 }
 
-model PersonaPrompt {
+model TrainingAccount {
+  id             String    @id @default(cuid())
+  xUsername      String    @unique
+  xId            String
+  displayName    String?
+  accessToken    String
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  scopes         String
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model ReferenceAccount {
+  id          String   @id @default(cuid())
+  xUsername   String   @unique
+  xId         String?
+  displayName String?
+  bio         String?
+  reason      String?
+  addedAt     DateTime @default(now())
+}
+
+model TrainingAction {
+  id             String   @id @default(cuid())
+  type           String
+  targetUsername String?
+  tweetId        String?
+  executedAt     DateTime @default(now())
+  status         String   @default("done")
+}
+
+model TimelinePost {
+  id             String    @id @default(cuid())
+  tweetId        String    @unique
+  authorUsername String?
+  content        String
+  fetchedAt      DateTime  @default(now())
+  score          Int?
+  feedback       String?
+  scoredAt       DateTime?
+}
+
+model TrainingStrategy {
+  id         String   @id @default(cuid())
+  content    String
+  generation Int      @default(1)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+model AccountFeedback {
+  id         String   @id @default(cuid())
+  xUsername  String
+  displayName String?
+  bio        String?
+  score      Int      // 1-10
+  reason     String?  // 1-5のとき：追加しない理由
+  action     String   // "added" | "rejected"
+  createdAt  DateTime @default(now())
+}
+
+model DiscoveryCandidate {
+  id             String    @id @default(cuid())
+  sourceUsername String    // 探索元参考アカウント
+  xUsername      String
+  xId            String
+  displayName    String?
+  bio            String?
+  followersCount Int?
+  followingCount Int?
+  tweetCount     Int?
+  aiScore        Int?      // Claude一次選別スコア 1-10
+  aiReason       String?   // Claude選別理由
+  userAction     String?   // "follow" | "skip" | null(未評価)
+  executedAt     DateTime? // フォロー実行日時
+  createdAt      DateTime  @default(now())
+}
+
+model DiscoveryState {
   id              String   @id @default(cuid())
-  version         String   @unique
-  versionNumber   Int
-  content         String
-  isActive        Boolean  @default(false)
-  reasoning       String?
-  predictedScore  Float?
-  actualScore     Float?
-  createdAt       DateTime @default(now())
-
-  candidates      Candidate[]
-  evolutions      PromptEvolution[] @relation("FromVersion")
-  evolutionsTo    PromptEvolution[] @relation("ToVersion")
-  feedbackBatches FeedbackBatch[]
-}
-
-model ExtractionPrompt {
-  id          String   @id @default(cuid())
-  version     String   @unique
-  content     String
-  isActive    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  candidates  Candidate[]
-}
-
-model EvaluationPrompt {
-  id          String   @id @default(cuid())
-  version     String   @unique
-  content     String
-  isActive    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  evaluations CandidateEvaluation[]
-}
-
-model MessageTemplate {
-  id            String   @id @default(cuid())
-  version       String   @unique
-  versionNumber Int
-  content       String
-  isActive      Boolean  @default(false)
-  reasoning     String?
-  createdAt     DateTime @default(now())
-
-  messages      OutreachMessage[]
-}
-
-model Candidate {
-  id                 String   @id @default(cuid())
-  xUsername          String   @unique
-  xId                String?
-  displayName        String?
-  bio                String?
-  followersCount     Int?
-  profileData        String?
-  sampleTweets       String?
-  status             String   @default("pending") // pending | contacted | passed
-  contactedAt        DateTime?
-  companyName        String?
-  fundingRound       String?  // "未調達" | "シード" | "プレシリーズA" | "シリーズA" | "シリーズB以降" | "不明"
-  fundingAmount      String?
-  fundingCheckedAt   DateTime?
-  holdReason         String?  // 保留の理由・解除条件
-  holdAlertAt        DateTime? // アラート発生日時（nullはアラートなし）
-  holdAlertText      String?  // Claude が検出した変化の説明
-  holdCheckedAt      DateTime? // 最後に保留チェックした日時
-  discoveredAt       DateTime @default(now())
-  lastFetchedAt      DateTime @default(now())
-
-  personaPromptId    String
-  personaPrompt      PersonaPrompt     @relation(fields: [personaPromptId], references: [id])
-
-  extractionPromptId String?
-  extractionPrompt   ExtractionPrompt? @relation(fields: [extractionPromptId], references: [id])
-
-  evaluation         CandidateEvaluation?
-  humanFeedbacks     HumanFeedback[]
-  outreachMessages   OutreachMessage[]
-}
-
-model OutreachMessage {
-  id                String   @id @default(cuid())
-  generatedText     String
-  editedText        String?
-  sources           String   // JSON: [{type: "tweet"|"bio", content: string, reason: string}]
-  sentAt            DateTime?
-  createdAt         DateTime @default(now())
-
-  candidateId       String
-  candidate         Candidate       @relation(fields: [candidateId], references: [id])
-
-  templateId        String
-  template          MessageTemplate @relation(fields: [templateId], references: [id])
-}
-
-model CandidateEvaluation {
-  id                  String   @id @default(cuid())
-  entrepreneurScore   Float
-  executionScore      Float
-  marketScore         Float
-  overallScore        Float
-  reasoning           String
-  keySignals          String
-  evaluatedAt         DateTime @default(now())
-
-  candidateId         String   @unique
-  candidate           Candidate        @relation(fields: [candidateId], references: [id])
-
-  evaluationPromptId  String
-  evaluationPrompt    EvaluationPrompt @relation(fields: [evaluationPromptId], references: [id])
-}
-
-model HumanFeedback {
-  id          String   @id @default(cuid())
-  score       Int
-  comment     String?
-  createdAt   DateTime @default(now())
-
-  candidateId String
-  candidate   Candidate      @relation(fields: [candidateId], references: [id])
-
-  batchId     String?
-  batch       FeedbackBatch? @relation(fields: [batchId], references: [id])
-}
-
-model FeedbackBatch {
-  id              String   @id @default(cuid())
-  overallComment  String?
-  averageScore    Float?
-  processedAt     DateTime?
-  createdAt       DateTime @default(now())
-
-  personaPromptId String
-  personaPrompt   PersonaPrompt  @relation(fields: [personaPromptId], references: [id])
-
-  feedbacks       HumanFeedback[]
-}
-
-model PromptEvolution {
-  id                   String   @id @default(cuid())
-  systemReasoning      String
-  changes              String
-  signalsUsed          String
-  predictedImprovement Float?
-  createdAt            DateTime @default(now())
-
-  fromVersionId        String
-  fromVersion          PersonaPrompt @relation("FromVersion", fields: [fromVersionId], references: [id])
-
-  toVersionId          String
-  toVersion            PersonaPrompt @relation("ToVersion", fields: [toVersionId], references: [id])
-}
-
-model XFetchLog {
-  id          String   @id @default(cuid())
-  query       String
-  fetchedAt   DateTime @default(now())
-  resultCount Int
-  nextToken   String?
-}
-
-model DevAlert {
-  id                String   @id @default(cuid())
-  triggerReason     String   // 見送り理由（ユーザーが入力したテキスト）
-  candidateUsername String   // どの候補者で発生したか
-  devDescription    String   // 何を作る必要があるかの説明
-  claudeCodePrompt  String   // Claude Code に貼るプロンプト案
-  status            String   @default("pending") // pending | implemented | dismissed
-  createdAt         DateTime @default(now())
-}
-
-model CollectionRun {
-  id                String   @id @default(cuid())
-  status            String   @default("running") // running | completed | failed
-  queriesUsed       String   // JSON array of queries
-  tweetsFound       Int      @default(0)
-  candidatesAdded   Int      @default(0)
-  candidatesSkipped Int      @default(0)
-  errors            String?  // JSON array of error messages
-  startedAt         DateTime @default(now())
-  completedAt       DateTime?
+  sourceUsername  String   @unique
+  sourceUserId    String
+  paginationToken String?  // 次ページトークン
+  totalFetched    Int      @default(0)
+  updatedAt       DateTime @updatedAt
 }

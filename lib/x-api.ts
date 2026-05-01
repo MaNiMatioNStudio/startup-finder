@@ -103,13 +103,32 @@ export async function getUserById(userId: string): Promise<XUser | null> {
 }
 
 export async function getUserByUsername(username: string): Promise<XUser | null> {
+  const data = await xFetch(`/users/by/username/${username}`, {
+    "user.fields": "description,public_metrics",
+  });
+  return data.data || null;
+}
+
+export async function getUserFollowers(
+  userId: string,
+  maxResults = 100,
+  paginationToken?: string
+): Promise<{ users: XUser[]; nextToken?: string; success: boolean; error?: string }> {
   try {
-    const data = await xFetch(`/users/by/username/${username}`, {
-      "user.fields": "description,public_metrics",
-    });
-    return data.data || null;
-  } catch {
-    return null;
+    const params: Record<string, string> = {
+      max_results: String(Math.min(maxResults, 1000)),
+      "user.fields": "description,public_metrics,username",
+    };
+    if (paginationToken) params.pagination_token = paginationToken;
+
+    const data = await xFetch(`/users/${userId}/followers`, params);
+    return {
+      users: data.data || [],
+      nextToken: data.meta?.next_token,
+      success: true,
+    };
+  } catch (err) {
+    return { users: [], success: false, error: String(err) };
   }
 }
 

@@ -1,6 +1,49 @@
 # Startup Finder
 
-プロンプト駆動型の起業家候補発掘・自律改善システム。
+X (Twitter) のアルゴリズムを AI で自律改善し、起業家・スタートアップ関連アカウントをタイムラインに最適化するツール。
+
+## 概要
+
+参照アカウント（お手本となる起業家）を起点に、フォロワーを探索して起業家候補を発掘します。
+Claude AI が投稿スコアとフィードバックを分析し、フォロー・いいね戦略を自動生成。
+実行 → 評価 → 戦略進化のループを繰り返すことで、X のタイムラインを継続的に改善します。
+
+## 主な機能
+
+| タブ | 機能 |
+|------|------|
+| **References** | 参照アカウントの追加・削除。AI による新規アカウント提案 |
+| **Discovery** | 参照アカウントのフォロワーを探索。Claude が起業家候補を抽出し、カード UI で評価（キーボード操作対応） |
+| **Session** | 戦略に基づいてフォロー・いいねを一括実行。実行ログを記録 |
+| **Timeline** | 参照アカウントの投稿を取得し 0〜10 でスコアリング |
+| **Strategy** | スコアとフィードバックから Claude が新戦略を生成・バージョン管理 |
+
+## ディレクトリ構成
+
+```
+startup-finder/
+├── app/
+│   ├── layout.tsx                  # ルートレイアウト（サイドバー含む）
+│   ├── training-account/
+│   │   └── page.tsx                # メインダッシュボード（5タブ）
+│   └── api/
+│       ├── auth/x/                 # X OAuth2 認証（PKCE）
+│       └── training-account/       # 各機能の API ルート
+├── components/
+│   ├── Sidebar.tsx
+│   ├── ScoreBar.tsx
+│   └── ScoreStars.tsx
+├── lib/
+│   ├── claude.ts                   # Claude API クライアント
+│   ├── x-api.ts                    # X API v2 クライアント
+│   ├── x-auth.ts                   # OAuth2 トークン管理・自動更新
+│   └── prisma.ts                   # Prisma クライアント
+├── prisma/
+│   ├── schema.prisma               # DB スキーマ（SQLite）
+│   └── migrations/                 # マイグレーション履歴
+├── .env.example                    # 環境変数のテンプレート
+└── CLAUDE.md                       # 開発ガイドライン
+```
 
 ## セットアップ
 
@@ -16,12 +59,7 @@ npm install
 cp .env.example .env
 ```
 
-`.env` に以下を設定してください:
-
-```
-ANTHROPIC_API_KEY=
-X_BEARER_TOKEN=
-```
+`.env` に必要なキーを設定してください（[環境変数](#環境変数) を参照）。
 
 ### 3. データベースの初期化
 
@@ -29,67 +67,74 @@ X_BEARER_TOKEN=
 npx prisma migrate dev
 ```
 
-### 4. 開発サーバー起動
+### 4. 開発サーバーの起動
+
+```bash
+npm run dev
+# → http://localhost:3000
+```
+
+## 環境変数
+
+`.env.example` をコピーして `.env` を作成し、以下の値を設定してください。
+
+| 変数名 | 必須 | 説明 |
+|--------|------|------|
+| `DATABASE_URL` | ✅ | SQLite ファイルパス（例: `file:./dev.db`） |
+| `ANTHROPIC_API_KEY` | ✅ | Anthropic API キー（[console.anthropic.com](https://console.anthropic.com)） |
+| `X_BEARER_TOKEN` | ✅ | X API v2 Bearer Token（アプリ認証・フォロワー取得用） |
+| `X_CLIENT_ID` | ✅ | X OAuth2 クライアント ID（ユーザー認証用） |
+| `X_CLIENT_SECRET` | ✅ | X OAuth2 クライアントシークレット |
+| `X_CALLBACK_URL` | ✅ | OAuth2 コールバック URL（例: `http://localhost:3000/api/auth/x/callback`） |
+| `X_API_KEY` | — | X API v1 キー（使用機能に応じて設定） |
+| `X_API_SECRET` | — | X API v1 シークレット |
+| `X_ACCESS_TOKEN` | — | X アクセストークン |
+| `X_ACCESS_TOKEN_SECRET` | — | X アクセストークンシークレット |
+| `BRAVE_SEARCH_API_KEY` | — | Brave Search API キー（省略時は DuckDuckGo にフォールバック） |
+
+## 実行方法
+
+### 開発サーバー
 
 ```bash
 npm run dev
 ```
 
-### 5. 初期データの作成
+### DB の確認（Prisma Studio）
 
-ブラウザで http://localhost:3000 を開き、「初期データを作成する」ボタンを押してください。
-
-## 使い方
-
-### 基本フロー
-
-1. **Candidates** ページで起業家候補を追加（手動 or X API）
-2. **Candidates** の候補を「AIで評価する」
-3. **Scoring** ページで候補に 1〜5 のスコアを付ける（任意でコメント）
-4. 「スコアを送信してシステムに考えさせる」を押す
-5. 「プロンプト進化を実行する」→ AI が自律的にパターンを分析してプロンプトを改善
-6. **Evolution** で AI の思考過程を確認
-7. **History** でバージョン間のパフォーマンスを比較
-
-### X API を使った自動発掘
-
-```
-POST /api/x/fetch
-{ "query": "MRR SaaS lang:ja" }
+```bash
+npx prisma studio
+# → http://localhost:5555
 ```
 
-### ページ構成
+### ビルド
 
-| ページ | 機能 |
-|--------|------|
-| `/` | ダッシュボード |
-| `/personas` | Persona Prompt のバージョン管理・編集 |
-| `/candidates` | 候補一覧・詳細・手動追加 |
-| `/scoring` | スコアリング → プロンプト進化トリガー |
-| `/evolution` | 進化ログと AI 思考過程 |
-| `/history` | バージョン比較・精度推移 |
-
-## コスト目安（月額）
-
-| 項目 | 金額 |
-|------|------|
-| Claude API（週次進化×4回、評価×50名） | ~¥500〜2,000 |
-| X API Basic | $100/月 (~¥15,000) |
-| 合計 | ~¥15,000以内 |
-
-## API エンドポイント
-
+```bash
+npm run build
+npm run start
 ```
-POST /api/seed                      # 初期データ作成
-GET  /api/personas                  # ペルソナ一覧
-POST /api/personas                  # 新バージョン作成
-POST /api/personas/[id]/activate    # バージョン有効化
-GET  /api/candidates                # 候補一覧
-POST /api/candidates/manual         # 手動追加（X API + AI評価）
-POST /api/candidates/[id]/evaluate  # AI評価
-GET  /api/scoring                   # 未スコア候補取得
-POST /api/scoring                   # スコアバッチ送信
-GET  /api/evolution                 # 進化履歴
-POST /api/evolution                 # 進化実行
-POST /api/x/fetch                   # X API から候補を自動発掘
+
+### スキーマ変更時
+
+```bash
+npx prisma migrate dev --name <変更名>
+npx prisma generate
 ```
+
+## 基本的な使い方
+
+1. **X アカウント連携** — サイドバーの「Connect X Account」から OAuth2 認証
+2. **References に追加** — お手本にしたい起業家のアカウントを登録
+3. **Discovery で探索** — 参照アカウントのフォロワーから起業家候補を発掘・評価
+4. **Timeline をスコアリング** — 参照アカウントの投稿に 0〜10 のスコアをつける
+5. **Strategy を進化** — Claude がスコアパターンを分析して戦略を自動生成
+6. **Session を実行** — 戦略に基づいてフォロー・いいねを一括実行
+7. **繰り返す** — 実行結果を評価し戦略を更新してループ
+
+## 注意事項
+
+- X API の利用には **Basic プラン（$100/月）以上** が必要です
+- Claude API の呼び出しはバッチ処理（50件ずつ）でコストを抑えています
+- フォロー・いいねの実行前に、X API のレート制限（15分ごとのリセット）に注意してください
+- OAuth2 のアクセストークンは自動更新されますが、再認証が必要になる場合があります
+- ローカル開発で ngrok などのトンネリングを使う場合、`X_CALLBACK_URL` をトンネル URL に合わせてください
